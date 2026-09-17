@@ -524,6 +524,17 @@
                     "default": false,
                     "markdownDescription": "%config.tableFormatter.delimiterRowNoPadding.description%"
                 },
+                "markdown.extension.tableFormatter.compact": {
+                    "type": "boolean",
+                    "default": false,
+                    "markdownDescription": "%config.tableFormatter.compact.description%"
+                },
+                "markdown.extension.tableFormatter.delimiterRowMinHyphens": {
+                    "type": "integer",
+                    "default": 3,
+                    "minimum": 1,
+                    "markdownDescription": "%config.tableFormatter.delimiterRowMinHyphens.description%"
+                },
                 "markdown.extension.theming.decoration.renderCodeSpan": {
                     "type": "boolean",
                     "default": true,

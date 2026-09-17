@@ -471,4 +471,160 @@ suite("Table formatter.", () => {
             ],
             new Selection(0, 0, 0, 0));
     });
+
+    test("Compact", async () => {
+        await updateConfiguration({ config: [["markdown.extension.tableFormatter.compact", true]] });
+        await testCommand('editor.action.formatDocument',
+            [
+                '| a | b-long | c | d-longest |',
+                '| --- | --- | --- | --- |',
+                '| w | x | y-longer | z |'
+            ],
+            new Selection(0, 0, 0, 0),
+            [
+                '| a | b-long | c | d-longest |',
+                '| --- | ------ | --- | --------- |',
+                '| w | x | y-longer | z |'
+            ],
+            new Selection(0, 0, 0, 0));
+        await resetConfiguration();
+    });
+
+    test("Compact, with alignment", async () => {
+        await updateConfiguration({ config: [["markdown.extension.tableFormatter.compact", true]] });
+        await testCommand('editor.action.formatDocument',
+            [
+                '| a | b-long | c | d-longest |',
+                '| --- | :--- | ---: | :---: |',
+                '| w | x | y-longer | z |'
+            ],
+            new Selection(0, 0, 0, 0),
+            [
+                '| a | b-long | c | d-longest |',
+                '| --- | :----- | ---: | :-------: |',
+                '| w | x | y-longer | z |'
+            ],
+            new Selection(0, 0, 0, 0));
+        await resetConfiguration();
+    });
+
+    test("Compact, delimiter row without padding", async () => {
+        await updateConfiguration({
+            config: [
+                ["markdown.extension.tableFormatter.compact", true],
+                ["markdown.extension.tableFormatter.delimiterRowNoPadding", true]
+            ]
+        });
+        await testCommand('editor.action.formatDocument',
+            [
+                '| a | b-long | c | d-longest |',
+                '| --- | --- | --- | --- |',
+                '| w | x | y-longer | z |'
+            ],
+            new Selection(0, 0, 0, 0),
+            [
+                '| a | b-long | c | d-longest |',
+                '|---|--------|---|-----------|',
+                '| w | x | y-longer | z |'
+            ],
+            new Selection(0, 0, 0, 0));
+        await resetConfiguration();
+    });
+
+    test("Compact, single-character header keeps the default minimum", async () => {
+        await updateConfiguration({ config: [["markdown.extension.tableFormatter.compact", true]] });
+        await testCommand('editor.action.formatDocument',
+            [
+                '| a | b | c | d |',
+                '| --- | :--- | ---: | :---: |',
+                '| w-longer | x-longer | y-longer | z-longer |'
+            ],
+            new Selection(0, 0, 0, 0),
+            [
+                '| a | b | c | d |',
+                '| --- | :--- | ---: | :---: |',
+                '| w-longer | x-longer | y-longer | z-longer |'
+            ],
+            new Selection(0, 0, 0, 0));
+        await resetConfiguration();
+    });
+
+    test("Compact, lowered minimum delimiter hyphens", async () => {
+        await updateConfiguration({
+            config: [
+                ["markdown.extension.tableFormatter.compact", true],
+                ["markdown.extension.tableFormatter.delimiterRowMinHyphens", 1]
+            ]
+        });
+        await testCommand('editor.action.formatDocument',
+            [
+                '| a | b | c | d |',
+                '| --- | :--- | ---: | :---: |',
+                '| w-longer | x-longer | y-longer | z-longer |'
+            ],
+            new Selection(0, 0, 0, 0),
+            [
+                '| a | b | c | d |',
+                '| - | :- | -: | :-: |',
+                '| w-longer | x-longer | y-longer | z-longer |'
+            ],
+            new Selection(0, 0, 0, 0));
+        await resetConfiguration();
+    });
+
+    test("Raised minimum delimiter hyphens, without compact", async () => {
+        await updateConfiguration({ config: [["markdown.extension.tableFormatter.delimiterRowMinHyphens", 5]] });
+        await testCommand('editor.action.formatDocument',
+            [
+                '| a | b |',
+                '| --- | :---: |',
+                '| c | d |'
+            ],
+            new Selection(0, 0, 0, 0),
+            [
+                '| a     |    b    |',
+                '| ----- | :-----: |',
+                '| c     |    d    |'
+            ],
+            new Selection(0, 0, 0, 0));
+        await resetConfiguration();
+    });
+
+    test("Compact, double-width header", async () => {
+        await updateConfiguration({ config: [["markdown.extension.tableFormatter.compact", true]] });
+        await testCommand('editor.action.formatDocument',
+            [
+                '| 中文 | Emoji ✅ |',
+                '| --- | --- |',
+                '| 测试测试 | ❌ |'
+            ],
+            new Selection(0, 0, 0, 0),
+            [
+                '| 中文 | Emoji ✅ |',
+                '| ---- | -------- |',
+                '| 测试测试 | ❌ |'
+            ],
+            new Selection(0, 0, 0, 0));
+        await resetConfiguration();
+    });
+
+    test("Compact, indented table", async () => {
+        await updateConfiguration({ config: [["markdown.extension.tableFormatter.compact", true]] });
+        await testCommand('editor.action.formatDocument',
+            [
+                '1. A list',
+                '    | a | b-long |',
+                '    | --- | --- |',
+                '    | w-longer | x |'
+            ],
+            new Selection(0, 0, 0, 0),
+            [
+                '1. A list',
+                '    | a | b-long |',
+                '    | --- | ------ |',
+                '    | w-longer | x |'
+            ],
+            new Selection(0, 0, 0, 0));
+        await resetConfiguration();
+    });
 });

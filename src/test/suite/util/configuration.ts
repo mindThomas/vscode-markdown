@@ -19,6 +19,8 @@ const Default_Config: readonly IConfigurationRecord[] = [
     ["markdown.extension.bold.indicator", "**"],
     ["markdown.extension.tableFormatter.normalizeIndentation", false],
     ["markdown.extension.tableFormatter.delimiterRowNoPadding", false],
+    ["markdown.extension.tableFormatter.compact", false],
+    ["markdown.extension.tableFormatter.delimiterRowMinHyphens", 3],
     ["editor.insertSpaces", true],
     ["editor.tabSize", 4],
 ];

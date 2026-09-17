@@ -122,8 +122,14 @@ class MarkdownDocumentFormatter implements vscode.DocumentFormattingEditProvider
         // The following operations require the Unicode Normalization Form C (NFC).
         const text = target.text.normalize();
 
+        const headerRowIndex = 0;
         const delimiterRowIndex = 1;
         const delimiterRowNoPadding = configManager.get('tableFormatter.delimiterRowNoPadding');
+        const compact = configManager.get('tableFormatter.compact');
+        // The shortest delimiter cell this formatter writes, counted in hyphens; each column alignment
+        // specification adds its own colons on top of that. Guarded because a delimiter cell with no hyphen
+        // at all is not a table any more.
+        const minHyphens = Math.max(1, Math.trunc(configManager.get('tableFormatter.delimiterRowMinHyphens')));
         const indentation = this.getTableIndentation(text, options);
 
         const rowsNoIndentPattern = new RegExp(/^\s*(\S.*)$/gum);
@@ -131,6 +137,8 @@ class MarkdownDocumentFormatter implements vscode.DocumentFormattingEditProvider
 
         // Desired "visual" width of each column (the length of the longest cell in each column), **without padding**
         const colWidth: number[] = [];
+        // "Visual" width of each header cell, **without padding**
+        const headerWidth: number[] = [];
         // Alignment of each column
         const colAlign: ColumnAlignment[] = [];
         // Regex to extract cell content.
@@ -177,39 +185,54 @@ class MarkdownDocumentFormatter implements vscode.DocumentFormattingEditProvider
                 const doubleWidthChars = cell.match(doubleWidthRegex);
                 const width = graphemeCount + (doubleWidthChars?.length ?? 0);
                 colWidth[iCol] = Math.max(colWidth[iCol] || 0, width);
+                if (iRow === headerRowIndex) {
+                    headerWidth[iCol] = width;
+                }
 
                 iCol++;
             }
             return values;
         });
 
+        // Width the delimiter row is normalized to. Without padding there is nothing to align the cells
+        // with, so the delimiter row follows the header cell instead of the widest cell in the column.
+        // That also keeps an edit to a data row from rewriting the delimiter row.
+        // Each branch below clamps that width to `minHyphens` plus the colons its column alignment
+        // specification needs, so the default of 3 keeps the conventional `---`, `:---`, `---:` and `:---:`
+        // forms while a lower setting lets the delimiter row line up with a very short header.
+        const delimiterWidth: number[] = compact ? headerWidth : colWidth;
+
         // Normalize the num of hyphen according to the desired column length
         lines[delimiterRowIndex] = lines[delimiterRowIndex].map((cell, iCol) => {
             if (/:-+:/.test(cell)) {
                 // :---:
                 colAlign[iCol] = ColumnAlignment.Center;
-                // Update the lower bound of visual `colWidth` (without padding) based on the column alignment specification
-                colWidth[iCol] = Math.max(colWidth[iCol], delimiterRowNoPadding ? 5 - 2 : 5);
+                // Update the lower bound of the visual delimiter width (without padding) based on the column alignment specification
+                const minWidth = minHyphens + 2;
+                delimiterWidth[iCol] = Math.max(delimiterWidth[iCol] ?? 0, delimiterRowNoPadding ? minWidth - 2 : minWidth);
                 // The length of all `-`, `:` chars in this delimiter cell
-                const specWidth = delimiterRowNoPadding ? colWidth[iCol] + 2 : colWidth[iCol];
+                const specWidth = delimiterRowNoPadding ? delimiterWidth[iCol] + 2 : delimiterWidth[iCol];
                 return ':' + '-'.repeat(specWidth - 2) + ':';
             } else if (/:-+/.test(cell)) {
                 // :---
                 colAlign[iCol] = ColumnAlignment.Left;
-                colWidth[iCol] = Math.max(colWidth[iCol], delimiterRowNoPadding ? 4 - 2 : 4);
-                const specWidth = delimiterRowNoPadding ? colWidth[iCol] + 2 : colWidth[iCol];
+                const minWidth = minHyphens + 1;
+                delimiterWidth[iCol] = Math.max(delimiterWidth[iCol] ?? 0, delimiterRowNoPadding ? minWidth - 2 : minWidth);
+                const specWidth = delimiterRowNoPadding ? delimiterWidth[iCol] + 2 : delimiterWidth[iCol];
                 return ':' + '-'.repeat(specWidth - 1);
             } else if (/-+:/.test(cell)) {
                 // ---:
                 colAlign[iCol] = ColumnAlignment.Right;
-                colWidth[iCol] = Math.max(colWidth[iCol], delimiterRowNoPadding ? 4 - 2 : 4);
-                const specWidth = delimiterRowNoPadding ? colWidth[iCol] + 2 : colWidth[iCol];
+                const minWidth = minHyphens + 1;
+                delimiterWidth[iCol] = Math.max(delimiterWidth[iCol] ?? 0, delimiterRowNoPadding ? minWidth - 2 : minWidth);
+                const specWidth = delimiterRowNoPadding ? delimiterWidth[iCol] + 2 : delimiterWidth[iCol];
                 return '-'.repeat(specWidth - 1) + ':';
             } else {
                 // ---
                 colAlign[iCol] = ColumnAlignment.None;
-                colWidth[iCol] = Math.max(colWidth[iCol], delimiterRowNoPadding ? 3 - 2 : 3);
-                const specWidth = delimiterRowNoPadding ? colWidth[iCol] + 2 : colWidth[iCol];
+                const minWidth = minHyphens;
+                delimiterWidth[iCol] = Math.max(delimiterWidth[iCol] ?? 0, delimiterRowNoPadding ? minWidth - 2 : minWidth);
+                const specWidth = delimiterRowNoPadding ? delimiterWidth[iCol] + 2 : delimiterWidth[iCol];
                 return '-'.repeat(specWidth);
             }
         });
@@ -217,6 +240,11 @@ class MarkdownDocumentFormatter implements vscode.DocumentFormattingEditProvider
         return lines.map((row, iRow) => {
             if (iRow === delimiterRowIndex && delimiterRowNoPadding) {
                 return indentation + '|' + row.join('|') + '|';
+            }
+
+            // Cells are already trimmed, so there is nothing left to do but join them
+            if (compact) {
+                return indentation + '| ' + row.join(' | ') + ' |';
             }
 
             let cells = row.map((cell, iCol) => {
